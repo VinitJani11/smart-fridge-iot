@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart Fridge IoT — VinitIOT</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0f172a;--surface:#1e293b;--surface2:#334155;
+      --border:#334155;--border2:#475569;
+      --text:#e2e8f0;--muted:#94a3b8;--subtle:#64748b;
+      --primary:#38bdf8;--primary-dark:#0369a1;
+      --success:#4ade80;--success-bg:#14532d;
+      --warning:#fbbf24;--warning-bg:#713f12;
+      --danger:#f87171;--danger-bg:#7f1d1d;
+      --radius:12px;--radius-sm:8px;
+    }
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+    /* Header */
+    header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(8px)}
+    .logo{display:flex;align-items:center;gap:10px}
+    .logo-icon{font-size:1.4rem}
+    .logo-text h1{font-size:.95rem;font-weight:700;color:var(--primary)}
+    .logo-text p{font-size:.7rem;color:var(--subtle)}
+    .header-right{display:flex;align-items:center;gap:12px}
+    .live-badge{display:flex;align-items:center;gap:6px;font-size:.72rem;font-weight:600;padding:4px 10px;border-radius:999px;border:1px solid var(--border2);color:var(--muted)}
+    .live-dot{width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    .last-update{font-size:.72rem;color:var(--subtle)}
+    .btn-settings{background:transparent;border:1px solid var(--border2);color:var(--muted);border-radius:var(--radius-sm);padding:5px 12px;cursor:pointer;font-size:.78rem;transition:.2s}
+    .btn-settings:hover{background:var(--surface2);color:var(--text)}
+
+    /* Alert banner */
+    #alert-banner{margin:20px 24px 0;border-radius:var(--radius);padding:14px 18px;display:flex;align-items:flex-start;gap:12px;display:none}
+    #alert-banner.show{display:flex}
+    #alert-banner.ok{background:#052e16;border:1px solid #166534;color:#4ade80}
+    #alert-banner.warn{background:#431407;border:1px solid #92400e;color:#fde68a}
+    #alert-banner.critical{background:#450a0a;border:1px solid #7f1d1d;color:#fca5a5}
+    .banner-icon{font-size:1.1rem;margin-top:1px}
+    .banner-body{flex:1}
+    .banner-title{font-weight:700;font-size:.9rem;margin-bottom:4px}
+    .banner-items{list-style:none;font-size:.8rem;opacity:.9}
+    .banner-items li::before{content:"• ";opacity:.6}
+
+    /* Main layout */
+    main{max-width:1200px;margin:0 auto;padding:20px 24px 40px}
+
+    /* Tabs */
+    .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:24px}
+    .tab-btn{background:transparent;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;padding:10px 18px;color:var(--muted);cursor:pointer;font-size:.85rem;font-weight:500;display:flex;align-items:center;gap:6px;transition:.15s;white-space:nowrap}
+    .tab-btn:hover{color:var(--text)}
+    .tab-btn.active{color:var(--primary);border-bottom-color:var(--primary)}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+
+    /* Grid */
+    .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    @media(max-width:900px){.grid-4{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:600px){.grid-4,.grid-2,.grid-3{grid-template-columns:1fr}}
+
+    /* Cards */
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+    .card.ok{border-color:#16a34a55}
+    .card.warn{border-color:#ca8a0455}
+    .card.critical{border-color:#dc262655}
+    .card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--subtle);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+    .card-value{font-size:2.6rem;font-weight:800;line-height:1;display:flex;align-items:flex-end;gap:4px}
+    .card-unit{font-size:.9rem;color:var(--muted);font-weight:400;margin-bottom:3px}
+    .card-sub{font-size:.75rem;color:var(--subtle);margin-top:8px}
+    .value-ok{color:var(--text)}
+    .value-warn{color:var(--warning)}
+    .value-critical{color:var(--danger)}
+
+    /* Badges */
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.68rem;font-weight:700}
+    .badge-ok{background:var(--success-bg);color:var(--success)}
+    .badge-warn{background:var(--warning-bg);color:var(--warning)}
+    .badge-critical{background:var(--danger-bg);color:var(--danger)}
+
+    /* Door card */
+    .door-card{display:flex;align-items:center;gap:16px;padding:20px 24px}
+    .door-icon{font-size:2.5rem}
+    .door-info{}
+    .door-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--subtle)}
+    .door-status{font-size:1.8rem;font-weight:800;margin-top:4px}
+    .door-time{margin-left:auto;text-align:right;font-size:.75rem;color:var(--subtle)}
+
+    /* Progress bar */
+    .progress-wrap{background:var(--surface2);border-radius:6px;height:8px;margin-top:12px;overflow:hidden}
+    .progress-bar{height:100%;border-radius:6px;transition:width .5s,background .5s}
+    .bar-ok{background:var(--success)}
+    .bar-warn{background:var(--warning)}
+    .bar-critical{background:var(--danger)}
+
+    /* Restock form */
+    .restock-row{display:flex;gap:8px;align-items:center;margin-top:14px}
+    .restock-row label{font-size:.75rem;color:var(--subtle)}
+    .restock-row input{width:60px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:6px;padding:5px 8px;font-size:.85rem}
+    .btn{background:var(--primary-dark);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 14px;font-size:.8rem;cursor:pointer;font-weight:600;transition:.2s}
+    .btn:hover{background:var(--primary)}
+    .btn-sm{padding:5px 10px;font-size:.75rem}
+
+    /* Chart cards */
+    .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+    .chart-title{font-size:.85rem;font-weight:600;color:var(--text);margin-bottom:4px}
+    .chart-sub{font-size:.72rem;color:var(--subtle);margin-bottom:16px}
+    .chart-wrap{position:relative;height:180px}
+
+    /* Notification log */
+    .notif-log{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+    .notif-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+    .notif-header h3{font-size:.9rem;font-weight:600;display:flex;align-items:center;gap:8px}
+    .notif-count{background:var(--danger);color:#fff;font-size:.65rem;font-weight:700;padding:2px 6px;border-radius:999px}
+    .notif-list{max-height:280px;overflow-y:auto}
+    .notif-item{display:flex;gap:10px;align-items:flex-start;padding:10px 20px;border-bottom:1px solid var(--border);font-size:.8rem}
+    .notif-item:last-child{border-bottom:none}
+    .notif-dot{width:7px;height:7px;border-radius:50%;margin-top:4px;flex-shrink:0}
+    .notif-msg{flex:1;color:#cbd5e1}
+    .notif-time{color:var(--subtle);white-space:nowrap;font-size:.72rem}
+    .notif-empty{padding:20px;text-align:center;color:var(--subtle);font-size:.85rem}
+
+    /* Simulator */
+    .sim-info{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+    .sim-info-inner{display:flex;gap:14px;align-items:flex-start}
+    .sim-info h3{font-size:.9rem;font-weight:600;margin-bottom:6px}
+    .sim-info p{font-size:.78rem;color:var(--muted);margin-bottom:8px}
+    .api-url-row{display:flex;gap:8px;align-items:center}
+    .api-url{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;font-family:monospace;font-size:.72rem;color:var(--primary);word-break:break-all}
+    .wokwi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+    .wokwi-header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+    .wokwi-header h3{font-size:.85rem;font-weight:600}
+    .wokwi-link{font-size:.75rem;color:var(--primary);text-decoration:none}
+    .wokwi-link:hover{text-decoration:underline}
+    iframe.wokwi{width:100%;height:580px;border:none;display:block}
+
+    /* History table */
+    .hist-table-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px}
+    .hist-table-title{padding:12px 20px;border-bottom:1px solid var(--border);font-size:.85rem;font-weight:600}
+    table{width:100%;border-collapse:collapse;font-size:.82rem}
+    th{text-align:left;padding:8px 20px;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--subtle);background:rgba(255,255,255,.03);border-bottom:1px solid var(--border)}
+    th.r,td.r{text-align:right}
+    td{padding:9px 20px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--muted)}
+    td.val{color:var(--text);font-family:monospace;font-weight:600}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:rgba(255,255,255,.02)}
+
+    /* Settings modal */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;display:none}
+    .modal-overlay.open{display:flex}
+    .modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:28px;width:100%;max-width:420px}
+    .modal h2{font-size:1rem;font-weight:700;margin-bottom:18px}
+    .field{margin-bottom:14px}
+    .field label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:6px}
+    .field input{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:var(--radius-sm);padding:8px 12px;font-size:.85rem}
+    .field input:focus{outline:2px solid var(--primary);outline-offset:1px}
+    .modal-actions{display:flex;gap:10px;margin-top:20px}
+    .btn-save{background:var(--primary-dark);flex:1}
+    .btn-cancel{background:var(--surface2);border:1px solid var(--border2);color:var(--muted)}
+    .section-divider{font-size:.75rem;font-weight:600;color:var(--subtle);text-transform:uppercase;letter-spacing:.08em;margin:18px 0 10px;padding-top:14px;border-top:1px solid var(--border)}
+    .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+    /* Spacer */
+    .gap{margin-bottom:16px}
+    .mt{margin-top:16px}
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <span class="logo-icon">🧊</span>
+    <div class="logo-text">
+      <h1>Smart Fridge IoT</h1>
+      <p>VinitIOT Dashboard</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="last-update" id="last-update">Connecting…</span>
+    <div class="live-badge"><span class="live-dot"></span>Live</div>
+    <button class="btn-settings" onclick="openSettings()">⚙ Settings</button>
+  </div>
+</header>
+
+<!-- Alert banner -->
+<div id="alert-banner">
+  <span class="banner-icon" id="banner-icon"></span>
+  <div class="banner-body">
+    <div class="banner-title" id="banner-title"></div>
+    <ul class="banner-items" id="banner-items"></ul>
+  </div>
+</div>
+
+<main>
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('overview',this)">📊 Overview</button>
+    <button class="tab-btn" onclick="switchTab('charts',this)">📈 Charts</button>
+    <button class="tab-btn" onclick="switchTab('simulator',this)">⚡ Simulator</button>
+    <button class="tab-btn" onclick="switchTab('history',this)">🕒 History</button>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="tab-panel active" id="tab-overview">
+    <div class="grid-4 gap">
+      <div class="card" id="card-temp">
+        <div class="card-label">Temperature <span id="badge-temp"></span></div>
+        <div class="card-value"><span id="val-temp">—</span><span class="card-unit">°C</span></div>
+        <div class="card-sub" id="sub-temp">Range: 0–8°C</div>
+      </div>
+      <div class="card" id="card-hum">
+        <div class="card-label">Humidity</div>
+        <div class="card-value"><span id="val-hum">—</span><span class="card-unit">%</span></div>
+        <div class="card-sub">Relative humidity</div>
+      </div>
+      <div class="card" id="card-mango">
+        <div class="card-label">Mango Weight <span id="badge-mango"></span></div>
+        <div class="card-value"><span id="val-mango">—</span><span class="card-unit">g</span></div>
+        <div class="card-sub" id="sub-mango">Alert below 50g</div>
+      </div>
+      <div class="card" id="card-milk">
+        <div class="card-label">Milk Supply <span id="badge-milk"></span></div>
+        <div class="card-value"><span id="val-milk">—</span><span class="card-unit">units</span></div>
+        <div class="card-sub" id="sub-milk">Alert below 2 units</div>
+      </div>
+    </div>
+
+    <!-- Door -->
+    <div class="card door-card gap" id="card-door">
+      <span class="door-icon" id="door-icon">🔒</span>
+      <div class="door-info">
+        <div class="door-label">Door Status</div>
+        <div class="door-status" id="door-status">—</div>
+      </div>
+      <div class="door-time">
+        <div>Last reading</div>
+        <div id="door-time">—</div>
+      </div>
+    </div>
+
+    <!-- Mini charts -->
+    <div class="grid-2 gap">
+      <div class="chart-card">
+        <div class="chart-title">Temperature (recent)</div>
+        <div class="chart-sub">Dashed lines = thresholds</div>
+        <div class="chart-wrap"><canvas id="mini-temp"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Humidity (recent)</div>
+        <div class="chart-sub">Relative humidity %</div>
+        <div class="chart-wrap"><canvas id="mini-hum"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Shelves -->
+    <div class="grid-2 gap">
+      <!-- Shelf 1 -->
+      <div class="card" id="shelf1-card">
+        <div class="card-label">Shelf 1 — Milk Bottles <span id="shelf1-badge"></span></div>
+        <div class="card-value"><span id="shelf1-count">—</span><span class="card-unit">bottles</span></div>
+        <div class="card-sub">Button press = 1 bottle removed</div>
+        <div class="progress-wrap"><div class="progress-bar" id="shelf1-bar"></div></div>
+        <div class="restock-row">
+          <label>Restock to:</label>
+          <input type="number" id="restock-input" value="8" min="1" max="50"/>
+          <button class="btn btn-sm" onclick="restockShelf1()">Restock</button>
+        </div>
+      </div>
+      <!-- Shelf 2 -->
+      <div class="card" id="shelf2-card">
+        <div class="card-label">Shelf 2 — Mangoes <span id="shelf2-badge"></span></div>
+        <div class="card-value"><span id="shelf2-weight">—</span><span class="card-unit">g</span></div>
+        <div class="card-sub">Potentiometer = mango weight</div>
+        <div class="progress-wrap"><div class="progress-bar" id="shelf2-bar"></div></div>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="notif-log">
+      <div class="notif-header">
+        <h3>Alert Log <span class="notif-count" id="notif-count" style="display:none">0</span></h3>
+        <button class="btn btn-sm" onclick="markAllRead()">Mark all read</button>
+      </div>
+      <div class="notif-list" id="notif-list">
+        <div class="notif-empty">No alerts yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="tab-panel" id="tab-charts">
+    <div class="chart-card gap">
+      <div class="chart-title">Temperature History</div>
+      <div class="chart-sub">Last 50 readings · Dashed lines = min/max thresholds</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-temp"></canvas></div>
+    </div>
+    <div class="chart-card gap">
+      <div class="chart-title">Humidity History</div>
+      <div class="chart-sub">Relative humidity %</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-hum"></canvas></div>
+    </div>
+    <div class="grid-2">
+      <div class="chart-card">
+        <div class="chart-title">Mango Weight History</div>
+        <div class="chart-sub" id="chart-mango-sub">Low alert threshold shown</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="chart-mango"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Milk Count History</div>
+        <div class="chart-sub" id="chart-milk-sub">Low alert threshold shown</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="chart-milk"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIMULATOR -->
+  <div class="tab-panel" id="tab-simulator">
+    <div class="sim-info">
+      <div class="sim-info-inner">
+        <span style="font-size:1.8rem;margin-top:2px">🔌</span>
+        <div>
+          <h3>Wokwi Arduino Simulator</h3>
+          <p>Your Arduino sketch should POST sensor data to your deployed backend. If using this static dashboard, configure your sketch to POST directly to Adafruit IO feeds.</p>
+          <p>Adafruit IO feed endpoint:</p>
+          <div class="api-url-row">
+            <div class="api-url">https://io.adafruit.com/api/v2/{username}/feeds/{feed-key}/data</div>
+            <button class="btn btn-sm" onclick="navigator.clipboard.writeText('https://io.adafruit.com/api/v2/VinitIOT/feeds/fridge-temperature/data')">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="wokwi-card">
+      <div class="wokwi-header">
+        <h3>Live Simulator</h3>
+        <a class="wokwi-link" href="https://wokwi.com/projects/464730115732465665" target="_blank" rel="noopener">Open in Wokwi ↗</a>
+      </div>
+      <iframe class="wokwi" src="https://wokwi.com/projects/464730115732465665?embed=1&theme=dark" title="Smart Fridge Wokwi Simulator" allow="fullscreen"></iframe>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="tab-panel" id="tab-history">
+    <div class="hist-table-card">
+      <div class="hist-table-title">Temperature Readings (°C)</div>
+      <table><thead><tr><th>Time</th><th class="r">Value</th></tr></thead>
+      <tbody id="hist-temp"></tbody></table>
+    </div>
+    <div class="hist-table-card">
+      <div class="hist-table-title">Humidity Readings (%)</div>
+      <table><thead><tr><th>Time</th><th class="r">Value</th></tr></thead>
+      <tbody id="hist-hum"></tbody></table>
+    </div>
+    <div class="hist-table-card">
+      <div class="hist-table-title">Mango Weight (g)</div>
+      <table><thead><tr><th>Time</th><th class="r">Value</th></tr></thead>
+      <tbody id="hist-mango"></tbody></table>
+    </div>
+    <div class="hist-table-card">
+      <div class="hist-table-title">Milk Count (units)</div>
+      <table><thead><tr><th>Time</th><th class="r">Value</th></tr></thead>
+      <tbody id="hist-milk"></tbody></table>
+    </div>
+  </div>
+</main>
+
+<!-- Settings modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2>⚙ Dashboard Settings</h2>
+    <div class="field">
+      <label>Adafruit IO Username</label>
+      <input type="text" id="cfg-username" placeholder="e.g. VinitIOT"/>
+    </div>
+    <div class="field">
+      <label>Adafruit IO Key</label>
+      <input type="password" id="cfg-key" placeholder="Your AIO key"/>
+    </div>
+    <div class="section-divider">Alert Thresholds</div>
+    <div class="field-row">
+      <div class="field">
+        <label>Min Temp (°C)</label>
+        <input type="number" id="cfg-min-temp" value="0"/>
+      </div>
+      <div class="field">
+        <label>Max Temp (°C)</label>
+        <input type="number" id="cfg-max-temp" value="8"/>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Mango Low Alert (g)</label>
+        <input type="number" id="cfg-mango-thresh" value="50"/>
+      </div>
+      <div class="field">
+        <label>Milk Low Alert (units)</label>
+        <input type="number" id="cfg-milk-thresh" value="2"/>
+      </div>
+    </div>
+    <div class="section-divider">Shelf Defaults</div>
+    <div class="field">
+      <label>Max Bottles (Shelf 1)</label>
+      <input type="number" id="cfg-max-bottles" value="8"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-save" onclick="saveSettings()">Save & Reload</button>
+      <button class="btn btn-cancel" onclick="closeSettings()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ───────────────────────────────────────────────────────────────────
+const DEFAULTS = {
+  username: 'VinitIOT',
+  key: '',
+  minTemp: 0, maxTemp: 8,
+  mangoThresh: 50, milkThresh: 2,
+  maxBottles: 8,
+};
+
+function cfg(k) {
+  const v = localStorage.getItem('sf_' + k);
+  return v !== null ? v : String(DEFAULTS[k] ?? '');
+}
+function cfgNum(k) { return parseFloat(cfg(k)) || DEFAULTS[k]; }
+
+const FEEDS = {
+  temperature: 'fridge-temperature',
+  humidity:    'fridge-humidity',
+  mango:       'mango-weight',
+  milk:        'milk-count',
+  door:        'fridge-door',
+  alert:       'fridge-alert',
+};
+
+function aioUrl(feed, suffix = 'data/last') {
+  return `https://io.adafruit.com/api/v2/${cfg('username')}/feeds/${feed}/${suffix}`;
+}
+
+async function aioFetch(url) {
+  const key = cfg('key');
+  const headers = key ? { 'X-AIO-Key': key } : {};
+  const r = await fetch(url, { headers });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+function openSettings() {
+  document.getElementById('cfg-username').value = cfg('username');
+  document.getElementById('cfg-key').value = cfg('key');
+  document.getElementById('cfg-min-temp').value = cfg('minTemp');
+  document.getElementById('cfg-max-temp').value = cfg('maxTemp');
+  document.getElementById('cfg-mango-thresh').value = cfg('mangoThresh');
+  document.getElementById('cfg-milk-thresh').value = cfg('milkThresh');
+  document.getElementById('cfg-max-bottles').value = cfg('maxBottles');
+  document.getElementById('modal').classList.add('open');
+}
+function closeSettings() { document.getElementById('modal').classList.remove('open'); }
+function saveSettings() {
+  ['username','key','minTemp','maxTemp','mangoThresh','milkThresh','maxBottles'].forEach(k => {
+    localStorage.setItem('sf_' + k, document.getElementById('cfg-' + k.replace(/([A-Z])/g,'-$1').toLowerCase()).value);
+  });
+  closeSettings();
+  location.reload();
+}
+
+// ── Notifications (localStorage) ──────────────────────────────────────────────
+function getNotifs() { return JSON.parse(localStorage.getItem('sf_notifs') || '[]'); }
+function saveNotifs(n) { localStorage.setItem('sf_notifs', JSON.stringify(n.slice(0, 60))); }
+function addNotif(msg, level) {
+  const notifs = getNotifs();
+  if (notifs.length && notifs[0].msg === msg) return;
+  notifs.unshift({ msg, level, time: new Date().toISOString(), read: false });
+  saveNotifs(notifs);
+  renderNotifs();
+}
+function renderNotifs() {
+  const notifs = getNotifs();
+  const unread = notifs.filter(n => !n.read).length;
+  const badge = document.getElementById('notif-count');
+  badge.textContent = unread;
+  badge.style.display = unread > 0 ? 'inline' : 'none';
+  const list = document.getElementById('notif-list');
+  if (!notifs.length) { list.innerHTML = '<div class="notif-empty">No alerts yet.</div>'; return; }
+  list.innerHTML = notifs.map(n => `
+    <div class="notif-item" style="${n.read ? 'opacity:.45' : ''}">
+      <div class="notif-dot" style="background:${n.level==='critical'?'var(--danger)':n.level==='warning'?'var(--warning)':'var(--primary)'}"></div>
+      <div class="notif-msg">${n.msg}</div>
+      <div class="notif-time">${fmtDateTime(n.time)}</div>
+    </div>`).join('');
+}
+function markAllRead() {
+  const n = getNotifs().map(x => ({...x, read: true}));
+  saveNotifs(n);
+  renderNotifs();
+}
+
+// ── Format helpers ────────────────────────────────────────────────────────────
+function fmtTime(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); } catch { return iso; }
+}
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); } catch { return iso; }
+}
+
+// ── Charts ───────────────────────────────────────────────────────────────────
+const CHART_OPTS = (color, refLines = []) => ({
+  type: 'line',
+  data: { labels: [], datasets: [{ data: [], borderColor: color, backgroundColor: color + '18',
+    borderWidth: 2, pointRadius: 0, tension: 0.3, fill: true }] },
+  options: {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false,
+      callbacks: { title: items => items[0]?.label || '' } } },
+    scales: {
+      x: { ticks: { color: '#64748b', maxTicksLimit: 8, font: { size: 10 } }, grid: { color: '#334155' } },
+      y: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#334155' } }
+    },
+    elements: { point: { hoverRadius: 4 } }
+  },
+  plugins: refLines.length ? [{
+    id: 'refs',
+    afterDraw(chart) {
+      const {ctx, scales: {y, x}} = chart;
+      refLines.forEach(({val, color: c}) => {
+        const yPos = y.getPixelForValue(val);
+        ctx.save();
+        ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = c;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x.left, yPos);
+        ctx.lineTo(x.right, yPos);
+        ctx.stroke();
+        ctx.restore();
+      });
+    }
+  }] : [],
+});
+
+function makeChart(id, color, refLines) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return null;
+  return new Chart(canvas, CHART_OPTS(color, refLines));
+}
+
+function updateChart(chart, points) {
+  if (!chart) return;
+  const data = points.map(p => ({ x: fmtTime(p.created_at), y: parseFloat(p.value) })).filter(p => !isNaN(p.y));
+  chart.data.labels = data.map(d => d.x);
+  chart.data.datasets[0].data = data.map(d => d.y);
+  chart.update('none');
+}
+
+let charts = {};
+
+function initCharts() {
+  const min = cfgNum('minTemp'), max = cfgNum('maxTemp');
+  const mt = cfgNum('mangoThresh'), milk = cfgNum('milkThresh');
+
+  charts.miniTemp = makeChart('mini-temp', '#38bdf8', [
+    {val: min, color: '#fbbf24'}, {val: max, color: '#f87171'}
+  ]);
+  charts.miniHum  = makeChart('mini-hum',  '#4ade80', []);
+  charts.temp     = makeChart('chart-temp','#38bdf8', [
+    {val: min, color: '#fbbf24'}, {val: max, color: '#f87171'}
+  ]);
+  charts.hum      = makeChart('chart-hum', '#4ade80', []);
+  charts.mango    = makeChart('chart-mango','#fbbf24',[{val: mt, color: '#f87171'}]);
+  charts.milk     = makeChart('chart-milk', '#a78bfa',[{val: milk, color: '#f87171'}]);
+
+  document.getElementById('chart-mango-sub').textContent = `Low alert ≤ ${mt}g`;
+  document.getElementById('chart-milk-sub').textContent  = `Low alert ≤ ${milk} units`;
+}
+
+// ── History tables ────────────────────────────────────────────────────────────
+function renderTable(tbodyId, points) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  const rows = [...points].reverse().slice(0, 30);
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--subtle)">No data</td></tr>'; return; }
+  tbody.innerHTML = rows.map(p => `<tr><td>${fmtDateTime(p.created_at)}</td><td class="r val">${p.value}</td></tr>`).join('');
+}
+
+// ── Sensor card helpers ───────────────────────────────────────────────────────
+function setCard(id, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'card ' + (cls || '');
+}
+function badge(id, label, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = label ? `<span class="badge ${cls}">${label}</span>` : '';
+}
+
+// ── Alert banner ──────────────────────────────────────────────────────────────
+function showBanner(issues, alertMsg) {
+  const banner = document.getElementById('alert-banner');
+  const icon   = document.getElementById('banner-icon');
+  const title  = document.getElementById('banner-title');
+  const items  = document.getElementById('banner-items');
+  banner.classList.add('show');
+  if (!issues.length) {
+    banner.className = 'show ok';
+    icon.textContent = '✓';
+    title.textContent = 'All Clear — Fridge operating normally';
+    items.innerHTML = alertMsg ? `<li>Latest: ${alertMsg}</li>` : '';
+  } else {
+    const hasCritical = issues.some(i => i.critical);
+    banner.className = 'show ' + (hasCritical ? 'critical' : 'warn');
+    icon.textContent = hasCritical ? '🔴' : '⚠';
+    title.textContent = 'Attention Required';
+    items.innerHTML = issues.map(i => `<li>${i.msg}</li>`).join('');
+  }
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
+let historyData = { temperature: [], humidity: [], mango: [], milk: [] };
+let shelf1Total = parseInt(cfg('maxBottles')) || 8;
+
+function render(live, hist, alertMsg) {
+  const minTemp = cfgNum('minTemp'), maxTemp = cfgNum('maxTemp');
+  const mangoThresh = cfgNum('mangoThresh'), milkThresh = cfgNum('milkThresh');
+  const issues = [];
+
+  // Temperature
+  const tempV = parseFloat(live.temperature);
+  const tempOk = !isNaN(tempV) && tempV >= minTemp && tempV <= maxTemp;
+  document.getElementById('val-temp').textContent = isNaN(tempV) ? '—' : tempV.toFixed(1);
+  document.getElementById('sub-temp').textContent = `Range: ${minTemp}–${maxTemp}°C`;
+  document.getElementById('val-temp').className = isNaN(tempV) ? '' : !tempOk ? 'value-critical' : tempV > maxTemp * 0.85 ? 'value-warn' : 'value-ok';
+  if (!isNaN(tempV) && !tempOk) {
+    const msg = `Temperature ${tempV.toFixed(1)}°C is outside safe range (${minTemp}–${maxTemp}°C)`;
+    issues.push({ msg, critical: true });
+    addNotif(msg, 'critical');
+    badge('badge-temp', '⚠ Alert', 'badge-critical');
+    setCard('card-temp', 'critical');
+  } else {
+    badge('badge-temp', '');
+    setCard('card-temp', isNaN(tempV) ? '' : 'ok');
+  }
+
+  // Humidity
+  const humV = parseFloat(live.humidity);
+  document.getElementById('val-hum').textContent = isNaN(humV) ? '—' : humV.toFixed(1);
+  setCard('card-hum', isNaN(humV) ? '' : 'ok');
+
+  // Mango
+  const mangoV = parseFloat(live.mango);
+  document.getElementById('val-mango').textContent = isNaN(mangoV) ? '—' : mangoV;
+  document.getElementById('sub-mango').textContent = `Alert below ${mangoThresh}g`;
+  document.getElementById('shelf2-weight').textContent = isNaN(mangoV) ? '—' : mangoV;
+  if (!isNaN(mangoV)) {
+    const low = mangoV <= mangoThresh;
+    const pct = Math.min(100, (mangoV / 1000) * 100);
+    const barCls = mangoV === 0 ? 'bar-critical' : low ? 'bar-warn' : 'bar-ok';
+    const bar = document.getElementById('shelf2-bar');
+    bar.style.width = pct + '%'; bar.className = 'progress-bar ' + barCls;
+    badge('badge-mango', low ? (mangoV === 0 ? 'Empty' : 'Low') : '', low ? (mangoV === 0 ? 'badge-critical' : 'badge-warn') : '');
+    badge('shelf2-badge', low ? (mangoV === 0 ? 'EMPTY' : 'LOW') : 'Sufficient', low ? (mangoV === 0 ? 'badge-critical' : 'badge-warn') : 'badge-ok');
+    setCard('card-mango', mangoV === 0 ? 'critical' : low ? 'warn' : 'ok');
+    setCard('shelf2-card', mangoV === 0 ? 'critical' : low ? 'warn' : 'ok');
+    if (low) { const msg = `Mango weight low (${mangoV}g ≤ ${mangoThresh}g)`; issues.push({msg, critical: mangoV===0}); addNotif(msg, mangoV===0?'critical':'warning'); }
+  }
+
+  // Milk
+  const milkV = parseFloat(live.milk);
+  document.getElementById('val-milk').textContent = isNaN(milkV) ? '—' : milkV;
+  document.getElementById('sub-milk').textContent = `Alert below ${milkThresh} units`;
+  document.getElementById('shelf1-count').textContent = isNaN(milkV) ? '—' : milkV;
+  if (!isNaN(milkV)) {
+    const low = milkV <= milkThresh;
+    const pct = Math.min(100, (milkV / shelf1Total) * 100);
+    const barCls = milkV === 0 ? 'bar-critical' : low ? 'bar-warn' : 'bar-ok';
+    const bar = document.getElementById('shelf1-bar');
+    bar.style.width = pct + '%'; bar.className = 'progress-bar ' + barCls;
+    badge('badge-milk', low ? (milkV === 0 ? 'Empty' : 'Low') : '', low ? (milkV === 0 ? 'badge-critical' : 'badge-warn') : '');
+    badge('shelf1-badge', low ? (milkV === 0 ? 'OUT OF STOCK' : 'LOW STOCK') : 'In stock', low ? (milkV === 0 ? 'badge-critical' : 'badge-warn') : 'badge-ok');
+    setCard('card-milk', milkV === 0 ? 'critical' : low ? 'warn' : 'ok');
+    setCard('shelf1-card', milkV === 0 ? 'critical' : low ? 'warn' : 'ok');
+    if (low) { const msg = `Milk supply low (${milkV} ≤ ${milkThresh} units)`; issues.push({msg, critical: milkV===0}); addNotif(msg, milkV===0?'critical':'warning'); }
+  }
+
+  // Door
+  const doorOpen = (live.door || '').toUpperCase().includes('OPEN');
+  document.getElementById('door-icon').textContent = doorOpen ? '🔓' : '🔒';
+  document.getElementById('door-status').textContent = live.door === '—' ? '—' : doorOpen ? 'Open' : 'Closed';
+  document.getElementById('door-status').className = 'door-status ' + (doorOpen ? 'value-warn' : 'value-ok');
+  document.getElementById('door-time').textContent = fmtDateTime(live.doorTime);
+  document.getElementById('card-door').className = 'card door-card ' + (doorOpen ? 'warn' : 'ok');
+  if (doorOpen) { const msg = 'Fridge door is OPEN!'; issues.push({msg, critical: false}); addNotif(msg, 'warning'); }
+
+  // Banner
+  showBanner(issues, alertMsg);
+
+  // Charts
+  updateChart(charts.miniTemp, hist.temperature.slice(-10));
+  updateChart(charts.miniHum,  hist.humidity.slice(-10));
+  updateChart(charts.temp,     hist.temperature);
+  updateChart(charts.hum,      hist.humidity);
+  updateChart(charts.mango,    hist.mango);
+  updateChart(charts.milk,     hist.milk);
+
+  // History tables
+  renderTable('hist-temp',  hist.temperature);
+  renderTable('hist-hum',   hist.humidity);
+  renderTable('hist-mango', hist.mango);
+  renderTable('hist-milk',  hist.milk);
+
+  document.getElementById('last-update').textContent = 'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+// ── Restock (writes to AIO) ───────────────────────────────────────────────────
+async function restockShelf1() {
+  const count = parseInt(document.getElementById('restock-input').value) || 8;
+  shelf1Total = count;
+  localStorage.setItem('sf_maxBottles', count);
+  try {
+    await fetch(aioUrl(FEEDS.milk, 'data'), {
+      method: 'POST',
+      headers: { 'X-AIO-Key': cfg('key'), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: String(count) })
+    });
+  } catch(e) { console.warn('Restock failed', e); }
+  fetchAll();
+}
+
+// ── Data fetching ─────────────────────────────────────────────────────────────
+async function fetchLive() {
+  const feeds = ['temperature','humidity','mango','milk','door','alert'];
+  const results = await Promise.all(feeds.map(f =>
+    aioFetch(aioUrl(FEEDS[f])).catch(() => ({ value: '—', created_at: '' }))
+  ));
+  return {
+    temperature: results[0].value,
+    humidity:    results[1].value,
+    mango:       results[2].value,
+    milk:        results[3].value,
+    door:        results[4].value,
+    doorTime:    results[4].created_at,
+    alert:       results[5].value,
+  };
+}
+
+async function fetchHistory(feed, limit = 50) {
+  try {
+    const data = await aioFetch(aioUrl(FEEDS[feed], `data?limit=${limit}`));
+    return Array.isArray(data) ? [...data].reverse() : [];
+  } catch { return []; }
+}
+
+async function fetchAll() {
+  try {
+    const [live, tempH, humH, mangoH, milkH] = await Promise.all([
+      fetchLive(),
+      fetchHistory('temperature'),
+      fetchHistory('humidity'),
+      fetchHistory('mango'),
+      fetchHistory('milk'),
+    ]);
+    historyData = { temperature: tempH, humidity: humH, mango: mangoH, milk: milkH };
+    render(live, historyData, live.alert);
+  } catch(e) {
+    console.error('Fetch error', e);
+    document.getElementById('last-update').textContent = 'Connection error';
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  initCharts();
+  renderNotifs();
+
+  // First-run: prompt for settings if no key set
+  if (!cfg('key')) {
+    setTimeout(openSettings, 300);
+  } else {
+    fetchAll();
+  }
+
+  // Refresh every 10 seconds
+  setInterval(fetchAll, 10000);
+});
+</script>
+</body>
+</html>
