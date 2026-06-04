@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/fridge-mobile/"
+title = "Smart Fridge Mobile"
+version = "1.0.0"
+id = "artifacts/fridge-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/fridge-mobile/" ]
+localPort = 19896
+
+[services.development]
+run = "pnpm --filter @workspace/fridge-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/fridge-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/fridge-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "19896"
+BASE_PATH = "/fridge-mobile/"
