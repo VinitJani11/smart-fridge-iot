@@ -70,8 +70,7 @@ A full-stack IoT project that monitors a smart fridge in real time using an **ES
 
 ```
 smart-fridge-iot/
-├── docs/
-│   └── index.html              # Static web dashboard (GitHub Pages)
+├── .github/workflows/          # GitHub Actions config
 ├── artifacts/
 │   ├── fridge-mobile/          # Expo React Native mobile app
 │   │   ├── app/(tabs)/
@@ -79,14 +78,20 @@ smart-fridge-iot/
 │   │   │   ├── controls.tsx    # Controls & thresholds screen
 │   │   │   └── settings.tsx    # AIO key settings screen
 │   │   ├── constants/
-│   │   │   ├── aio.ts          # Adafruit IO feed keys & API helpers
+│   │   │   ├── aio.ts          # Adafruit IO feed keys
 │   │   │   └── storage.ts      # AsyncStorage key management
 │   │   └── context/
 │   │       └── FridgeContext.tsx  # Global state & AIO data fetching
 │   ├── web-dashboard/          # React + Vite dashboard (dev version)
 │   └── api-server/             # Express API server (dev only)
-└── lib/
-    └── db/                     # PostgreSQL schema (Drizzle ORM)
+├── docs/
+│   └── index.html              # Static web dashboard (GitHub Pages)
+├── lib/
+│   └── db/                     # PostgreSQL schema (Drizzle ORM)
+├── scripts/                    # Utility scripts
+├── pnpm-workspace.yaml         # Workspace package config
+├── tsconfig.base.json          # Shared TypeScript config
+└── README.md
 ```
 
 ---
