@@ -1,6 +1,6 @@
-import { useFridge } from "@/context/FridgeContext";
+import { useFridge, sendValueWithKey } from "@/context/FridgeContext";
 import { useColors } from "@/hooks/useColors";
-import { FEEDS, sendValue } from "@/constants/aio";
+import { FEEDS } from "@/constants/aio";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useState } from "react";
@@ -111,7 +111,7 @@ function ThresholdInput({ testID, value, onChangeText, unit, placeholder, onPres
 
 export default function ControlsScreen() {
   const colors = useColors();
-  const { milk, tempHistory, refresh, mangoThreshold, milkThreshold, minTemp, maxTemp } = useFridge();
+  const { milk, tempHistory, refresh, mangoThreshold, milkThreshold, minTemp, maxTemp, aioKey, aioUsername } = useFridge();
   const isWeb = Platform.OS === "web";
 
   const [maxTempInput, setMaxTempInput] = useState<string>(String(maxTemp));
@@ -138,7 +138,7 @@ export default function ControlsScreen() {
     try {
       setResetting(true);
       await haptic();
-      await sendValue(FEEDS.resetMilk, "1");
+      await sendValueWithKey(FEEDS.resetMilk, "1", aioKey, aioUsername);
       refresh();
       Alert.alert("Done", "Milk counter reset to 10.");
     } catch {
@@ -157,7 +157,7 @@ export default function ControlsScreen() {
     try {
       setSavingMaxTemp(true);
       await haptic();
-      await sendValue(FEEDS.maxTemp, maxTempInput);
+      await sendValueWithKey(FEEDS.maxTemp, maxTempInput, aioKey, aioUsername);
       refresh();
       Alert.alert("Done", `Max temperature set to ${maxTempInput}°C.`);
     } catch {
@@ -176,7 +176,7 @@ export default function ControlsScreen() {
     try {
       setSavingMinTemp(true);
       await haptic();
-      await sendValue(FEEDS.minTemp, minTempInput);
+      await sendValueWithKey(FEEDS.minTemp, minTempInput, aioKey, aioUsername);
       refresh();
       Alert.alert("Done", `Min temperature set to ${minTempInput}°C.`);
     } catch {
@@ -195,7 +195,7 @@ export default function ControlsScreen() {
     try {
       setSavingMango(true);
       await haptic();
-      await sendValue(FEEDS.mangoThreshold, mangoThreshInput);
+      await sendValueWithKey(FEEDS.mangoThreshold, mangoThreshInput, aioKey, aioUsername);
       refresh();
       Alert.alert("Done", `Mango low alert set to ≤${mangoThreshInput}g.`);
     } catch {
@@ -214,7 +214,7 @@ export default function ControlsScreen() {
     try {
       setSavingMilk(true);
       await haptic();
-      await sendValue(FEEDS.milkThreshold, milkThreshInput);
+      await sendValueWithKey(FEEDS.milkThreshold, milkThreshInput, aioKey, aioUsername);
       refresh();
       Alert.alert("Done", `Milk low alert set to ≤${milkThreshInput} units.`);
     } catch {

@@ -1,4 +1,5 @@
 import { useColors } from "@/hooks/useColors";
+import { useFridge } from "@/context/FridgeContext";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Tabs } from "expo-router";
@@ -12,6 +13,7 @@ export default function TabLayout() {
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+  const { noKey } = useFridge();
 
   return (
     <Tabs
@@ -68,6 +70,20 @@ export default function TabLayout() {
               <SymbolView name="slider.horizontal.3" tintColor={color} size={22} />
             ) : (
               <Feather name="sliders" size={20} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarBadge: noKey ? "!" : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.destructive, color: "#fff", fontSize: 10 },
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="gearshape.fill" tintColor={color} size={22} />
+            ) : (
+              <Ionicons name="settings-outline" size={22} color={color} />
             ),
         }}
       />

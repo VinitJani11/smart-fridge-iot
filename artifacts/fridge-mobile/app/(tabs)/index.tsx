@@ -41,11 +41,27 @@ export default function DashboardScreen() {
   if (noKey) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <Ionicons name="key-outline" size={40} color={colors.mutedForeground} />
-        <Text style={[styles.errorTitle, { color: colors.foreground }]}>No AIO Key</Text>
+        <Ionicons name="key-outline" size={48} color={colors.primary} />
+        <Text style={[styles.errorTitle, { color: colors.foreground }]}>Setup Required</Text>
         <Text style={[styles.errorMsg, { color: colors.mutedForeground }]}>
-          Set EXPO_PUBLIC_AIO_KEY in your environment to connect to Adafruit IO.
+          Go to the Settings tab and enter your Adafruit IO key to connect your fridge.
         </Text>
+        <View style={[{
+          backgroundColor: `${colors.primary}15`,
+          borderColor: `${colors.primary}35`,
+          borderWidth: 1,
+          borderRadius: colors.radius,
+          padding: 12,
+          marginTop: 8,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+        }]}>
+          <Ionicons name="arrow-forward-circle-outline" size={18} color={colors.primary} />
+          <Text style={{ color: colors.primary, fontFamily: "Inter_500Medium", fontSize: 14 }}>
+            Tap ⚙ Settings tab below
+          </Text>
+        </View>
       </View>
     );
   }

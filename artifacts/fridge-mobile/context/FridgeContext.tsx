@@ -1,5 +1,33 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { AIO_KEY, FEEDS, fetchHistory, fetchLastValue } from "@/constants/aio";
+import { FEEDS } from "@/constants/aio";
+import { getStoredAioKey, getStoredAioUsername } from "@/constants/storage";
+
+const API_BASE = "https://io.adafruit.com/api/v2";
+
+async function fetchLast(feedKey: string, aioKey: string, username: string) {
+  const res = await fetch(`${API_BASE}/${username}/feeds/${feedKey}/data/last`, {
+    headers: { "X-AIO-Key": aioKey },
+  });
+  if (!res.ok) throw new Error(`${feedKey}: ${res.status}`);
+  return res.json() as Promise<{ value: string; created_at: string }>;
+}
+
+async function fetchHist(feedKey: string, limit: number, aioKey: string, username: string) {
+  const res = await fetch(`${API_BASE}/${username}/feeds/${feedKey}/data?limit=${limit}`, {
+    headers: { "X-AIO-Key": aioKey },
+  });
+  if (!res.ok) throw new Error(`${feedKey} history: ${res.status}`);
+  return res.json() as Promise<Array<{ value: string; created_at: string }>>;
+}
+
+export async function sendValueWithKey(feedKey: string, value: string, aioKey: string, username: string) {
+  const res = await fetch(`${API_BASE}/${username}/feeds/${feedKey}/data`, {
+    method: "POST",
+    headers: { "X-AIO-Key": aioKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ value }),
+  });
+  if (!res.ok) throw new Error(`send ${feedKey}: ${res.status}`);
+}
 
 export type FridgeData = {
   temperature: string;
@@ -14,7 +42,10 @@ export type FridgeData = {
   loading: boolean;
   error: string | null;
   noKey: boolean;
+  aioKey: string;
+  aioUsername: string;
   refresh: () => void;
+  reloadKey: () => Promise<void>;
   mangoThreshold: number;
   milkThreshold: number;
   minTemp: number;
@@ -39,12 +70,28 @@ export function FridgeProvider({ children }: { children: React.ReactNode }) {
   const [milkThreshold, setMilkThreshold] = useState<number>(2);
   const [minTemp, setMinTemp] = useState<number>(0);
   const [maxTemp, setMaxTemp] = useState<number>(8);
+  const [aioKey, setAioKey] = useState<string>("");
+  const [aioUsername, setAioUsername] = useState<string>("VinitIOT");
 
-  const noKey = !AIO_KEY;
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const keyRef = useRef<string>("");
+  const usernameRef = useRef<string>("VinitIOT");
+
+  const noKey = !aioKey;
+
+  const reloadKey = useCallback(async () => {
+    const k = await getStoredAioKey();
+    const u = await getStoredAioUsername();
+    keyRef.current = k;
+    usernameRef.current = u;
+    setAioKey(k);
+    setAioUsername(u);
+  }, []);
 
   const refresh = useCallback(async () => {
-    if (noKey) {
+    const k = keyRef.current;
+    const u = usernameRef.current;
+    if (!k) {
       setLoading(false);
       return;
     }
@@ -52,17 +99,17 @@ export function FridgeProvider({ children }: { children: React.ReactNode }) {
     try {
       const [tData, hData, mData, milkData, doorData, alertData, hist,
              mangoThreshData, milkThreshData, minTempData, maxTempData] = await Promise.all([
-        fetchLastValue(FEEDS.temperature).catch(() => ({ value: "--", created_at: "" })),
-        fetchLastValue(FEEDS.humidity).catch(() => ({ value: "--", created_at: "" })),
-        fetchLastValue(FEEDS.mango).catch(() => ({ value: "--", created_at: "" })),
-        fetchLastValue(FEEDS.milk).catch(() => ({ value: "--", created_at: "" })),
-        fetchLastValue(FEEDS.door).catch(() => ({ value: "--", created_at: "" })),
-        fetchLastValue(FEEDS.alert).catch(() => ({ value: "", created_at: "" })),
-        fetchHistory(FEEDS.temperature, 10).catch(() => [] as Array<{ value: string; created_at: string }>),
-        fetchLastValue(FEEDS.mangoThreshold).catch(() => ({ value: "50", created_at: "" })),
-        fetchLastValue(FEEDS.milkThreshold).catch(() => ({ value: "2", created_at: "" })),
-        fetchLastValue(FEEDS.minTemp).catch(() => ({ value: "0", created_at: "" })),
-        fetchLastValue(FEEDS.maxTemp).catch(() => ({ value: "8", created_at: "" })),
+        fetchLast(FEEDS.temperature, k, u).catch(() => ({ value: "--", created_at: "" })),
+        fetchLast(FEEDS.humidity, k, u).catch(() => ({ value: "--", created_at: "" })),
+        fetchLast(FEEDS.mango, k, u).catch(() => ({ value: "--", created_at: "" })),
+        fetchLast(FEEDS.milk, k, u).catch(() => ({ value: "--", created_at: "" })),
+        fetchLast(FEEDS.door, k, u).catch(() => ({ value: "--", created_at: "" })),
+        fetchLast(FEEDS.alert, k, u).catch(() => ({ value: "", created_at: "" })),
+        fetchHist(FEEDS.temperature, 10, k, u).catch(() => [] as Array<{ value: string; created_at: string }>),
+        fetchLast(FEEDS.mangoThreshold, k, u).catch(() => ({ value: "50", created_at: "" })),
+        fetchLast(FEEDS.milkThreshold, k, u).catch(() => ({ value: "2", created_at: "" })),
+        fetchLast(FEEDS.minTemp, k, u).catch(() => ({ value: "0", created_at: "" })),
+        fetchLast(FEEDS.maxTemp, k, u).catch(() => ({ value: "8", created_at: "" })),
       ]);
 
       setTemperature(tData.value);
@@ -104,21 +151,24 @@ export function FridgeProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [noKey]);
+  }, []);
 
   useEffect(() => {
-    refresh();
-    intervalRef.current = setInterval(refresh, 15000);
+    reloadKey().then(() => {
+      refresh();
+      intervalRef.current = setInterval(refresh, 15000);
+    });
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [refresh]);
+  }, [reloadKey, refresh]);
 
   return (
     <FridgeContext.Provider
       value={{
         temperature, humidity, mango, milk, door,
-        alertMsg, alertTime, tempHistory, lastUpdated, loading, error, noKey, refresh,
+        alertMsg, alertTime, tempHistory, lastUpdated, loading, error,
+        noKey, aioKey, aioUsername, refresh, reloadKey,
         mangoThreshold, milkThreshold, minTemp, maxTemp,
       }}
     >

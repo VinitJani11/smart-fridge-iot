@@ -14,9 +14,16 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.vinitiot.smartfridge"
     },
-    "android": {},
+    "android": {
+      "package": "com.vinitiot.smartfridge",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#0369a1"
+      }
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
